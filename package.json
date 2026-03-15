@@ -9,7 +9,8 @@
     "run-agent": "node server/scripts/manualRun.js",
     "client": "cd client && npm run dev",
     "build-client": "cd client && npm run build",
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build",
+    "postinstall": "cd client && npm install && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
