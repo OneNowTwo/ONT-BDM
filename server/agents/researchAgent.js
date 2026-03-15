@@ -70,7 +70,7 @@ async function runResearchAgent() {
       console.log(`[Research] Searching: "${searchQuery}"`);
 
       const response = await claudeMessage({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-5-20251001',
         maxTokens: 4000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         system: RESEARCH_SYSTEM_PROMPT,

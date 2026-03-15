@@ -3,13 +3,22 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = path.resolve(process.env.DB_PATH || './server/db/bdm.sqlite');
+let dbPath = path.resolve(process.env.DB_PATH || './server/db/bdm.sqlite');
 
-// Ensure directory exists
+// Ensure directory exists — fall back to local path if the configured dir
+// can't be created (e.g. /data not yet mounted on Render)
 const dir = path.dirname(dbPath);
 if (!fs.existsSync(dir)) {
-  fs.mkdirSync(dir, { recursive: true });
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    console.warn(`[DB] Cannot create ${dir}: ${err.message} — falling back to local path`);
+    dbPath = path.resolve('./server/db/bdm.sqlite');
+    const localDir = path.dirname(dbPath);
+    if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
+  }
 }
+console.log(`[DB] Using database at ${dbPath}`);
 
 const db = new Database(dbPath);
 

@@ -26,7 +26,7 @@ that justifies why you're contacting them specifically.`;
 
 async function draftOutreach(prospect) {
   const response = await claudeMessage({
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-4-5-20251001',
     maxTokens: 1200,
     system: OUTREACH_SYSTEM_PROMPT,
     messages: [{
