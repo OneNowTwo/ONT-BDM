@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: one-now-two-bdm
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /data/bdm.sqlite
+    disk:
+      name: bdm-data
+      mountPath: /data
+      sizeGB: 1
