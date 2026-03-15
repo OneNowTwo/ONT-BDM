@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ProspectCard from '../components/ProspectCard';
+import { API_BASE } from '../config';
 
 const styles = {
   header: { marginBottom: 32 },
@@ -27,17 +28,25 @@ export default function MorningReview() {
   const [prospects, setProspects] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = async () => {
-    const [pRes, sRes] = await Promise.all([
-      fetch('/api/prospects/pending'),
-      fetch('/api/prospects/stats'),
-    ]);
-    const { prospects: p } = await pRes.json();
-    const s = await sRes.json();
-    setProspects(p);
-    setStats(s);
-    setLoading(false);
+    try {
+      const [pRes, sRes] = await Promise.all([
+        fetch(`${API_BASE}/prospects/pending`),
+        fetch(`${API_BASE}/prospects/stats`),
+      ]);
+      if (!pRes.ok || !sRes.ok) throw new Error('Server error');
+      const { prospects: p } = await pRes.json();
+      const s = await sRes.json();
+      setProspects(p);
+      setStats(s);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load prospects. Is the server running?');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -79,14 +88,18 @@ export default function MorningReview() {
 
       {loading && <div style={styles.loading}>Loading prospects...</div>}
 
-      {!loading && prospects.length === 0 && (
+      {!loading && error && (
+        <div style={{ textAlign: 'center', color: '#f87171', padding: '60px 0', fontSize: 13 }}>{error}</div>
+      )}
+
+      {!loading && !error && prospects.length === 0 && (
         <div style={styles.empty}>
           <div style={styles.emptyTitle}>No prospects pending review</div>
           <div>The nightly agent will surface new prospects at 2am. Or trigger a run manually from the nav.</div>
         </div>
       )}
 
-      {!loading && prospects.length > 0 && (
+      {!loading && !error && prospects.length > 0 && (
         <div style={styles.list}>
           {prospects.map(p => (
             <ProspectCard key={p.id} prospect={p} onStatusChange={handleStatusChange} />

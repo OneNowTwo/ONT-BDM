@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ProspectCard from '../components/ProspectCard';
+import { API_BASE } from '../config';
 
 const STATUSES = [
   'pending_review', 'approved', 'contacted', 'replied', 'won', 'lost', 'not_interested', 'rejected',
@@ -33,15 +34,23 @@ export default function Pipeline() {
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [error, setError] = useState(null);
 
   const load = async () => {
     setLoading(true);
-    const url = filter === 'all' ? '/api/prospects?limit=100' : `/api/prospects?status=${filter}&limit=100`;
-    const res = await fetch(url);
-    const { prospects: p, total: t } = await res.json();
-    setProspects(p);
-    setTotal(t);
-    setLoading(false);
+    try {
+      const url = filter === 'all' ? `${API_BASE}/prospects?limit=100` : `${API_BASE}/prospects?status=${filter}&limit=100`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Server error');
+      const { prospects: p, total: t } = await res.json();
+      setProspects(p);
+      setTotal(t);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load pipeline. Is the server running?');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [filter]);
@@ -73,11 +82,15 @@ export default function Pipeline() {
 
       {loading && <div style={styles.loading}>Loading...</div>}
 
-      {!loading && prospects.length === 0 && (
+      {!loading && error && (
+        <div style={{ ...styles.empty, color: '#f87171' }}>{error}</div>
+      )}
+
+      {!loading && !error && prospects.length === 0 && (
         <div style={styles.empty}>No prospects found for this filter.</div>
       )}
 
-      {!loading && prospects.length > 0 && (
+      {!loading && !error && prospects.length > 0 && (
         <div style={styles.list}>
           {prospects.map(p => (
             <ProspectCard key={p.id} prospect={p} onStatusChange={() => load()} />

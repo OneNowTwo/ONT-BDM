@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBadge, ScoreBadge } from './StatusBadge';
 import DraftEditor from './DraftEditor';
+import { API_BASE } from '../config';
 
 const styles = {
   card: {
@@ -64,7 +65,7 @@ export default function ProspectCard({ prospect, onStatusChange }) {
   });
 
   const updateStatus = async (newStatus) => {
-    await fetch(`/api/prospects/${prospect.id}`, {
+    await fetch(`${API_BASE}/prospects/${prospect.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -77,7 +78,7 @@ export default function ProspectCard({ prospect, onStatusChange }) {
     if (!prospect.email || sending || emailSent) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/outreach/${draft.id}/send-email`, { method: 'POST' });
+      const res = await fetch(`${API_BASE}/outreach/${draft.id}/send-email`, { method: 'POST' });
       if (res.ok) {
         setEmailSent(true);
         setStatus('contacted');

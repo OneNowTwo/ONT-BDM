@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { API_BASE } from '../config';
 
 const NAV = [
   { to: '/review', label: 'Morning Review' },
@@ -70,7 +71,7 @@ export default function Navbar() {
 
   useEffect(() => {
     const check = () =>
-      fetch('/api/runs/status')
+      fetch(`${API_BASE}/runs/status`)
         .then(r => r.json())
         .then(d => setRunning(d.running))
         .catch(() => {});
@@ -82,7 +83,7 @@ export default function Navbar() {
   const triggerRun = async () => {
     if (running) return;
     try {
-      const res = await fetch('/api/runs/trigger', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/runs/trigger`, { method: 'POST' });
       if (res.ok) setRunning(true);
     } catch {}
   };

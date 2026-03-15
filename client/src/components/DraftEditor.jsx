@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const styles = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 16 },
@@ -67,7 +68,7 @@ export default function DraftEditor({ draft, onSave }) {
 
   const save = async () => {
     if (!draft?.id) return;
-    await fetch(`/api/outreach/${draft.id}`, {
+    await fetch(`${API_BASE}/outreach/${draft.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -86,7 +87,7 @@ export default function DraftEditor({ draft, onSave }) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     if (draft?.id) {
-      await fetch(`/api/outreach/${draft.id}/copy-dm`, { method: 'POST' });
+      await fetch(`${API_BASE}/outreach/${draft.id}/copy-dm`, { method: 'POST' });
     }
   };
 
@@ -140,7 +141,7 @@ export default function DraftEditor({ draft, onSave }) {
             borderColor: emailWords > 200 ? '#f87171' : emailWords < 140 ? '#666' : '#2a2a2a',
           }}
           onFocus={e => (e.target.style.borderColor = '#C9A84C')}
-          onBlur={e => (e.target.style.borderColor = '#2a2a2a')}
+          onBlur={e => (e.target.style.borderColor = emailWords > 200 ? '#f87171' : emailWords < 140 ? '#666' : '#2a2a2a')}
           placeholder="Email body (150-200 words)..."
         />
         <div style={{ ...styles.wordCount, ...(emailWords > 200 ? styles.wordCountWarn : {}) }}>

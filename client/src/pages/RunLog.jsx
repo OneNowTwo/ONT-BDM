@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 
 const styles = {
   header: { marginBottom: 28 },
@@ -91,22 +92,43 @@ function RunCard({ run }) {
   );
 }
 
+const loadRuns = () =>
+  fetch(`${API_BASE}/runs`).then(r => r.json()).then(({ runs: r }) => r).catch(() => []);
+
 export default function RunLog() {
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
-    fetch('/api/runs').then(r => r.json()).then(({ runs: r }) => { setRuns(r); setLoading(false); });
-    fetch('/api/runs/status').then(r => r.json()).then(d => setRunning(d.running));
+    loadRuns().then(r => { setRuns(r); setLoading(false); });
+    fetch(`${API_BASE}/runs/status`).then(r => r.json()).then(d => setRunning(d.running)).catch(() => {});
   }, []);
+
+  // Poll status while a run is active; refresh run list when it finishes
+  useEffect(() => {
+    if (!running) return;
+    const interval = setInterval(() => {
+      fetch(`${API_BASE}/runs/status`)
+        .then(r => r.json())
+        .then(d => {
+          if (!d.running) {
+            setRunning(false);
+            loadRuns().then(r => setRuns(r));
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [running]);
 
   const triggerRun = async () => {
     if (running) return;
-    const res = await fetch('/api/runs/trigger', { method: 'POST' });
-    if (res.ok) {
-      setRunning(true);
-      setTimeout(() => window.location.reload(), 3000);
+    try {
+      const res = await fetch(`${API_BASE}/runs/trigger`, { method: 'POST' });
+      if (res.ok) setRunning(true);
+    } catch (err) {
+      console.error('[RunLog] Failed to trigger run:', err.message);
     }
   };
 

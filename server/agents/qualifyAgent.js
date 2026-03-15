@@ -5,7 +5,7 @@ const QUALIFY_THRESHOLD = 7;
 
 async function qualifyProspect(prospect) {
   const response = await claudeMessage({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-3-7-sonnet-20250219',
     maxTokens: 500,
     messages: [{
       role: 'user',

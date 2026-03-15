@@ -5,6 +5,7 @@ const APIFY_BASE = 'https://api.apify.com/v2';
 const TOKEN = process.env.APIFY_API_TOKEN;
 
 const LINKEDIN_ACTOR = 'apify/linkedin-profile-scraper';
+const GOOGLE_SEARCH_ACTOR = 'apify/google-search-scraper';
 
 /**
  * Run an Apify actor and wait for the result
@@ -59,15 +60,19 @@ async function scrapeLinkedInProfile(profileUrl) {
 }
 
 /**
- * Search LinkedIn profiles by query — returns array of profile data
+ * Search for a LinkedIn profile URL via Google — more reliable than passing
+ * a search query to the profile scraper (which expects profileUrls as input).
  */
-async function searchLinkedInProfiles(searchQuery, maxResults = 10) {
+async function searchLinkedInProfiles(searchQuery, maxResults = 3) {
   try {
-    const results = await runActor(LINKEDIN_ACTOR, {
-      searchQuery,
-      maxResults,
+    const results = await runActor(GOOGLE_SEARCH_ACTOR, {
+      queries: `site:linkedin.com/in/ ${searchQuery}`,
+      maxPagesPerQuery: 1,
+      resultsPerPage: maxResults,
     });
-    return results || [];
+    return (results || [])
+      .filter(r => r.url && r.url.includes('linkedin.com/in/'))
+      .map(r => ({ url: r.url, linkedInUrl: r.url }));
   } catch (err) {
     console.error(`[Apify] LinkedIn search failed for "${searchQuery}":`, err.message);
     return [];

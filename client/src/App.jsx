@@ -6,8 +6,6 @@ import Pipeline from './pages/Pipeline';
 import FollowUps from './pages/FollowUps';
 import RunLog from './pages/RunLog';
 
-const API_BASE = '/api';
-
 export default function App() {
   return (
     <BrowserRouter>
@@ -26,5 +24,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
-export { API_BASE };

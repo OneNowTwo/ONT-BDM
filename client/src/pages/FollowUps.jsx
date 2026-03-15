@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE } from '../config';
 
 const styles = {
   header: { marginBottom: 28 },
@@ -46,25 +47,37 @@ export default function FollowUps() {
   const [followups, setFollowups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [error, setError] = useState(null);
 
   const load = async () => {
     setLoading(true);
-    const url = showAll ? '/api/followups?all=1' : '/api/followups';
-    const res = await fetch(url);
-    const { followups: f } = await res.json();
-    setFollowups(f);
-    setLoading(false);
+    try {
+      const url = showAll ? `${API_BASE}/followups?all=1` : `${API_BASE}/followups`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Server error');
+      const { followups: f } = await res.json();
+      setFollowups(f);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load follow-ups. Is the server running?');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [showAll]);
 
   const updateStatus = async (id, status) => {
-    await fetch(`/api/followups/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    setFollowups(prev => prev.filter(f => f.id !== id));
+    try {
+      await fetch(`${API_BASE}/followups/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      setFollowups(prev => prev.filter(f => f.id !== id));
+    } catch (err) {
+      console.error('[FollowUps] Failed to update status:', err.message);
+    }
   };
 
   return (
@@ -90,14 +103,18 @@ export default function FollowUps() {
 
       {loading && <div style={styles.loading}>Loading...</div>}
 
-      {!loading && followups.length === 0 && (
+      {!loading && error && (
+        <div style={{ ...styles.empty, color: '#f87171' }}>{error}</div>
+      )}
+
+      {!loading && !error && followups.length === 0 && (
         <div style={styles.empty}>
           <div style={styles.emptyTitle}>No follow-ups due</div>
           <div>Follow-ups are created automatically when you send outreach.</div>
         </div>
       )}
 
-      {!loading && followups.length > 0 && (
+      {!loading && !error && followups.length > 0 && (
         <div style={styles.list}>
           {followups.map(f => {
             const overdue = isOverdue(f.due_date);
