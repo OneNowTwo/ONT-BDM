@@ -8,7 +8,7 @@ const client = new Anthropic({
 /**
  * Generic Claude message call — wraps the SDK for reuse across agents
  */
-async function claudeMessage({ model = 'claude-sonnet-4-20250514', maxTokens = 2000, system, messages, tools }) {
+async function claudeMessage({ model = 'claude-3-5-sonnet-20241022', maxTokens = 2000, system, messages, tools }) {
   const params = {
     model,
     max_tokens: maxTokens,
