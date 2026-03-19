@@ -61,15 +61,10 @@ const PROSPECT_SCHEMA = `{
   "why_video_now": "specific reason they need video right now"
 }`;
 
-async function runResearchAgent() {
-  const allProspects = [];
-  const errors = [];
-
-  for (const searchQuery of RESEARCH_SOURCES) {
+async function searchWithRetry(searchQuery, maxRetries = 3) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[Research] Searching: "${searchQuery}"`);
-
-      const response = await claudeMessage({
+      return await claudeMessage({
         model: 'claude-haiku-4-5-20251001',
         maxTokens: 4000,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
@@ -86,6 +81,27 @@ Each object must have:
 ${PROSPECT_SCHEMA}`,
         }],
       });
+    } catch (err) {
+      if (err.status === 429 && attempt < maxRetries) {
+        const waitSecs = 65;
+        console.log(`[Research] Rate limited — waiting ${waitSecs}s before retry ${attempt + 1}/${maxRetries}...`);
+        await new Promise(r => setTimeout(r, waitSecs * 1000));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+async function runResearchAgent() {
+  const allProspects = [];
+  const errors = [];
+
+  for (const searchQuery of RESEARCH_SOURCES) {
+    try {
+      console.log(`[Research] Searching: "${searchQuery}"`);
+
+      const response = await searchWithRetry(searchQuery);
 
       const text = extractText(response);
       const clean = text.replace(/```json\n?|```\n?/g, '').trim();
