@@ -7,6 +7,13 @@ const { draftOutreach } = require('./agents/draftAgent');
 const { clearPipelineCancel, isPipelineCancelRequested } = require('./pipelineCancel');
 const db = require('./db/db');
 
+function cleanSourceUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const t = url.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return null;
+}
+
 /**
  * Full nightly pipeline — research → enrich → qualify → draft → save
  */
@@ -98,19 +105,20 @@ async function runNightlyPipeline() {
         const result = db.prepare(`
           INSERT INTO prospects 
             (name, agency, role, linkedin_url, email, source_url, 
-             personalisation_hook, why_video_now, qualify_score, qualify_reasoning, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review')
+             personalisation_hook, why_video_now, qualify_score, qualify_reasoning, status, research_query)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?)
         `).run(
           prospect.name,
           prospect.agency || null,
           prospect.role || null,
           prospect.linkedin_url || null,
           prospect.email || null,
-          prospect.source_url || null,
+          cleanSourceUrl(prospect.source_url) ?? null,
           prospect.personalisation_hook || null,
           prospect.why_video_now || null,
           prospect.qualify_score,
           prospect.qualify_reasoning || null,
+          prospect.research_query || null,
         );
 
         // Draft outreach

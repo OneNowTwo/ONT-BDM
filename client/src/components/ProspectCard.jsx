@@ -48,6 +48,10 @@ const styles = {
 
 const STATUS_FLOW = ['pending_review', 'approved', 'contacted', 'replied', 'won', 'lost', 'not_interested'];
 
+function isHttpUrl(s) {
+  return typeof s === 'string' && /^https?:\/\//i.test(s.trim());
+}
+
 export default function ProspectCard({ prospect, onStatusChange }) {
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(prospect.status);
@@ -111,12 +115,22 @@ export default function ProspectCard({ prospect, onStatusChange }) {
                 LinkedIn ↗
               </a>
             )}
-            {prospect.source_url && (
+            {isHttpUrl(prospect.source_url) && (
               <a href={prospect.source_url} target="_blank" rel="noreferrer" style={{ ...styles.link, color: '#666' }} onClick={e => e.stopPropagation()}>
                 Source ↗
               </a>
             )}
           </div>
+          {prospect.research_query && (
+            <div
+              style={{ fontSize: 11, color: '#555', marginTop: 8, lineHeight: 1.45 }}
+              title={prospect.research_query}
+              onClick={e => e.stopPropagation()}
+            >
+              <span style={{ color: '#444', fontWeight: 600, letterSpacing: '0.06em' }}>RESEARCH LOG · </span>
+              {prospect.research_query}
+            </div>
+          )}
         </div>
         <div style={styles.headerRight}>
           <span style={{ ...styles.chevron, transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
@@ -128,6 +142,12 @@ export default function ProspectCard({ prospect, onStatusChange }) {
           <div style={styles.grid}>
             <div style={styles.section}>
               <div style={styles.sectionTitle}>Prospect Details</div>
+              {prospect.research_query && (
+                <div style={styles.field}>
+                  <span style={styles.fieldLabel}>Research search (same as server log)</span>
+                  <span style={styles.fieldValue}>{prospect.research_query}</span>
+                </div>
+              )}
               {prospect.personalisation_hook && (
                 <div style={styles.field}>
                   <span style={styles.fieldLabel}>Why them</span>

@@ -24,7 +24,7 @@ For each prospect you find, extract:
 - Role / title
 - LinkedIn URL (if findable)
 - Email (if publicly listed)
-- Source URL where you found them
+- Source URL: full https:// link only, or null — never placeholders like "Source 1"
 - Key personalisation hook (what specific thing about them or their listing is relevant)
 - Why they need video right now (specific reasoning)
 
@@ -62,12 +62,21 @@ const PROSPECT_SCHEMA = `{
   "why_video_now": "specific reason they need video right now"
 }`;
 
-async function searchWithRetry(searchQuery, maxRetries = 3) {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+/** Min ms between research API calls — web_search blows past 50k input TPM if this is too low */
+const RESEARCH_QUERY_GAP_MS = Math.max(
+  0,
+  parseInt(process.env.RESEARCH_QUERY_GAP_MS || '65000', 10) || 65000,
+);
+
+const RATE_LIMIT_BACKOFF_SECS = [75, 90, 120, 120, 150, 150];
+
+async function searchWithRetry(searchQuery, maxAttempts = 7) {
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await claudeMessage({
         model: 'claude-haiku-4-5-20251001',
-        maxTokens: 4000,
+        maxTokens: 3500,
         tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         system: RESEARCH_SYSTEM_PROMPT,
         messages: [{
@@ -83,20 +92,46 @@ ${PROSPECT_SCHEMA}`,
         }],
       });
     } catch (err) {
-      if (err.status === 429 && attempt < maxRetries) {
-        const waitSecs = 65;
-        console.log(`[Research] Rate limited — waiting ${waitSecs}s before retry ${attempt + 1}/${maxRetries}...`);
+      lastErr = err;
+      if (err.status === 429 && attempt < maxAttempts - 1) {
+        const waitSecs = RATE_LIMIT_BACKOFF_SECS[Math.min(attempt, RATE_LIMIT_BACKOFF_SECS.length - 1)];
+        console.log(`[Research] Rate limited — waiting ${waitSecs}s (attempt ${attempt + 1}/${maxAttempts})...`);
         await new Promise(r => setTimeout(r, waitSecs * 1000));
       } else {
         throw err;
       }
     }
   }
+  throw lastErr;
+}
+
+async function runOneResearchQuery(searchQuery, allProspects, errors, label) {
+  console.log(`[Research] ${label}: "${searchQuery}"`);
+  const response = await searchWithRetry(searchQuery);
+
+  const text = extractText(response);
+  const clean = text.replace(/```json\n?|```\n?/g, '').trim();
+
+  const jsonMatch = clean.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    console.warn(`[Research] No JSON array found for query: "${searchQuery}"`);
+    return false;
+  }
+
+  const prospects = JSON.parse(jsonMatch[0]);
+  if (Array.isArray(prospects)) {
+    console.log(`[Research] Found ${prospects.length} prospects from "${searchQuery}"`);
+    for (const p of prospects) {
+      allProspects.push({ ...p, research_query: searchQuery });
+    }
+  }
+  return true;
 }
 
 async function runResearchAgent() {
   const allProspects = [];
   const errors = [];
+  const rateLimitRetryQueue = [];
 
   for (const searchQuery of RESEARCH_SOURCES) {
     if (isPipelineCancelRequested()) {
@@ -105,32 +140,40 @@ async function runResearchAgent() {
       break;
     }
     try {
-      console.log(`[Research] Searching: "${searchQuery}"`);
-
-      const response = await searchWithRetry(searchQuery);
-
-      const text = extractText(response);
-      const clean = text.replace(/```json\n?|```\n?/g, '').trim();
-
-      const jsonMatch = clean.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.warn(`[Research] No JSON array found for query: "${searchQuery}"`);
-        continue;
-      }
-
-      const prospects = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(prospects)) {
-        console.log(`[Research] Found ${prospects.length} prospects from "${searchQuery}"`);
-        allProspects.push(...prospects);
-      }
-
+      await runOneResearchQuery(searchQuery, allProspects, errors, 'Searching');
     } catch (err) {
-      const msg = `Research error for "${searchQuery}": ${err.message}`;
-      console.error(`[Research] ${msg}`);
-      errors.push(msg);
+      if (err.status === 429) {
+        console.warn(`[Research] Rate limit on "${searchQuery}" — queued for cooldown retry`);
+        rateLimitRetryQueue.push(searchQuery);
+      } else {
+        const msg = `Research error for "${searchQuery}": ${err.message}`;
+        console.error(`[Research] ${msg}`);
+        errors.push(msg);
+      }
     }
 
-    await new Promise(r => setTimeout(r, 2000));
+    if (RESEARCH_QUERY_GAP_MS > 0) {
+      await new Promise(r => setTimeout(r, RESEARCH_QUERY_GAP_MS));
+    }
+  }
+
+  // Second pass: sources that still 429'd after backoff — extra cooldown then one more try each
+  if (rateLimitRetryQueue.length > 0 && !isPipelineCancelRequested()) {
+    console.log(`[Research] Retrying ${rateLimitRetryQueue.length} source(s) that hit rate limits after cooldown...`);
+    await new Promise(r => setTimeout(r, 90000));
+    for (const searchQuery of rateLimitRetryQueue) {
+      if (isPipelineCancelRequested()) break;
+      try {
+        await runOneResearchQuery(searchQuery, allProspects, errors, 'Retry');
+      } catch (err) {
+        const msg = `Research retry error for "${searchQuery}": ${err.message}`;
+        console.error(`[Research] ${msg}`);
+        errors.push(msg);
+      }
+      if (RESEARCH_QUERY_GAP_MS > 0) {
+        await new Promise(r => setTimeout(r, RESEARCH_QUERY_GAP_MS));
+      }
+    }
   }
 
   const seen = new Set();

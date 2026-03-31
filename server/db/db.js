@@ -31,4 +31,9 @@ const schemaPath = path.join(__dirname, 'schema.sql');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 db.exec(schema);
 
+const prospectCols = db.prepare('PRAGMA table_info(prospects)').all().map(c => c.name);
+if (!prospectCols.includes('research_query')) {
+  db.exec('ALTER TABLE prospects ADD COLUMN research_query TEXT');
+}
+
 module.exports = db;

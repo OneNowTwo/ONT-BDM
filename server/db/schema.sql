@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS prospects (
   linkedin_url TEXT,
   email TEXT,
   source_url TEXT,
+  research_query TEXT,
   personalisation_hook TEXT,
   why_video_now TEXT,
   qualify_score INTEGER,
