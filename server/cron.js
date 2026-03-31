@@ -4,6 +4,7 @@ const { runResearchAgent, RESEARCH_SOURCES } = require('./agents/researchAgent')
 const { enrichWithLinkedIn } = require('./agents/enrichAgent');
 const { qualifyAll } = require('./agents/qualifyAgent');
 const { draftOutreach } = require('./agents/draftAgent');
+const { clearPipelineCancel, isPipelineCancelRequested } = require('./pipelineCancel');
 const db = require('./db/db');
 
 /**
@@ -16,6 +17,7 @@ async function runNightlyPipeline() {
   }
 
   global.agentRunning = true;
+  clearPipelineCancel();
   const runStart = Date.now();
   console.log('[BDM] Nightly pipeline starting:', new Date().toISOString());
 
@@ -30,6 +32,12 @@ async function runNightlyPipeline() {
     rawCount = rawProspects.length;
     allErrors.push(...researchErrors);
     console.log(`[BDM] Found ${rawCount} raw prospects`);
+
+    if (isPipelineCancelRequested()) {
+      allErrors.push('Pipeline cancelled by user (after research)');
+      console.log('[BDM] Cancelled after research — stopping');
+      return;
+    }
 
     // ─── Step 2: Dedup against existing DB ──────────────────────────────────
     const existing = db.prepare('SELECT name, agency FROM prospects').all();
@@ -53,11 +61,23 @@ async function runNightlyPipeline() {
     console.log('[BDM] Step 2/4 — Enriching with LinkedIn data...');
     const enriched = await enrichWithLinkedIn(newProspects);
 
+    if (isPipelineCancelRequested()) {
+      allErrors.push('Pipeline cancelled by user (after enrich)');
+      console.log('[BDM] Cancelled after enrich — stopping');
+      return;
+    }
+
     // ─── Step 4: Qualify — only keep score 7+ ────────────────────────────────
     console.log('[BDM] Step 3/4 — Qualifying prospects...');
     const qualified = await qualifyAll(enriched);
     qualifiedCount = qualified.length;
     console.log(`[BDM] ${qualifiedCount} qualified (score 7+)`);
+
+    if (isPipelineCancelRequested()) {
+      allErrors.push('Pipeline cancelled by user (after qualify)');
+      console.log('[BDM] Cancelled after qualify — stopping');
+      return;
+    }
 
     // ─── Step 5: Take top 20, draft outreach + save ───────────────────────────
     const top20 = qualified
@@ -66,7 +86,13 @@ async function runNightlyPipeline() {
 
     console.log(`[BDM] Step 4/4 — Drafting outreach for ${top20.length} prospects...`);
 
+    let savedForReview = 0;
     for (const prospect of top20) {
+      if (isPipelineCancelRequested()) {
+        allErrors.push('Pipeline cancelled by user (during draft/save)');
+        console.log('[BDM] Cancelled during draft — stopping');
+        break;
+      }
       try {
         // Save prospect to DB
         const result = db.prepare(`
@@ -104,6 +130,7 @@ async function runNightlyPipeline() {
         );
 
         console.log(`[BDM] Saved: ${prospect.name} @ ${prospect.agency} (${prospect.qualify_score}/10)`);
+        savedForReview += 1;
         await new Promise(r => setTimeout(r, 500));
 
       } catch (err) {
@@ -113,7 +140,7 @@ async function runNightlyPipeline() {
       }
     }
 
-    console.log(`[BDM] Pipeline complete. ${top20.length} prospects ready for morning review.`);
+    console.log(`[BDM] Pipeline complete. ${savedForReview} prospect(s) saved for morning review.`);
 
   } catch (err) {
     const msg = `Pipeline fatal error: ${err.message}`;

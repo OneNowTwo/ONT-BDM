@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { claudeMessage, parseJSON } = require('../services/claude');
+const { isPipelineCancelRequested } = require('../pipelineCancel');
 
 const QUALIFY_THRESHOLD = 7;
 
@@ -53,6 +54,10 @@ async function qualifyAll(prospects, threshold = QUALIFY_THRESHOLD) {
   const qualified = [];
 
   for (const prospect of prospects) {
+    if (isPipelineCancelRequested()) {
+      console.log('[Qualify] Cancelled — returning partial qualified list');
+      break;
+    }
     try {
       const { score, reasoning } = await qualifyProspect(prospect);
       console.log(`[Qualify] ${prospect.name} @ ${prospect.agency} → ${score}/10`);

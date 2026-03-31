@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { claudeMessage, extractText } = require('../services/claude');
+const { isPipelineCancelRequested } = require('../pipelineCancel');
 
 const RESEARCH_SYSTEM_PROMPT = `You are an autonomous business development research agent for One Now Two, 
 a Sydney-based commercial property video production company.
@@ -98,6 +99,11 @@ async function runResearchAgent() {
   const errors = [];
 
   for (const searchQuery of RESEARCH_SOURCES) {
+    if (isPipelineCancelRequested()) {
+      errors.push('Research stopped early: pipeline cancelled by user');
+      console.log('[Research] Cancelled — returning partial results');
+      break;
+    }
     try {
       console.log(`[Research] Searching: "${searchQuery}"`);
 

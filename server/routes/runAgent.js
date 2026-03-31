@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db/db');
 const { runNightlyPipeline } = require('../cron');
+const { requestPipelineCancel } = require('../pipelineCancel');
 
 // GET /api/runs — get run history
 router.get('/', (req, res) => {
@@ -27,6 +28,18 @@ router.post('/trigger', async (req, res) => {
 // GET /api/runs/status — is the agent currently running?
 router.get('/status', (req, res) => {
   res.json({ running: !!global.agentRunning });
+});
+
+// POST /api/runs/cancel — request graceful stop (checked between pipeline steps)
+router.post('/cancel', (req, res) => {
+  if (!global.agentRunning) {
+    return res.json({ success: false, message: 'No pipeline is running.' });
+  }
+  requestPipelineCancel();
+  res.json({
+    success: true,
+    message: 'Cancel requested. The run will stop after the current API call finishes.',
+  });
 });
 
 module.exports = router;

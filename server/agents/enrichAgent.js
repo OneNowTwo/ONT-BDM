@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { scrapeLinkedInProfile, searchLinkedInProfiles } = require('../services/apify');
+const { isPipelineCancelRequested } = require('../pipelineCancel');
 
 /**
  * Attempt to find a LinkedIn URL for a prospect if not already known
@@ -49,6 +50,10 @@ async function enrichWithLinkedIn(prospects) {
   const enriched = [];
 
   for (const prospect of prospects) {
+    if (isPipelineCancelRequested()) {
+      console.log('[Enrich] Cancelled — returning partial enrichments');
+      break;
+    }
     const result = await enrichProspect(prospect);
     enriched.push(result);
     await new Promise(r => setTimeout(r, 1500));
